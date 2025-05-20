@@ -1,0 +1,421 @@
+{
+  "metadata": {
+    "kernelspec": {
+      "name": "ir",
+      "display_name": "R",
+      "language": "R"
+    },
+    "language_info": {
+      "name": "R",
+      "codemirror_mode": "r",
+      "pygments_lexer": "r",
+      "mimetype": "text/x-r-source",
+      "file_extension": ".r",
+      "version": "4.4.0"
+    }
+  },
+  "nbformat": 4,
+  "nbformat_minor": 4,
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "source": [
+        "# Video Game Sales Data Cleaning in R\n",
+        "\n",
+        "**Author**: Theresa Gyamfi Allotey\n",
+        "\n",
+        "**Date**: 2025-05-15\n"
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Introduction\n",
+        "\n",
+        "This document outlines the data cleaning process for the `vgsales.csv` dataset, sourced from Kaggle. The dataset contains 16,598 records of video game sales across 11 columns: `Rank`, `Name`, `Platform`, `Year`, `Genre`, `Publisher`, `NA_Sales`, `EU_Sales`, `JP_Sales`, `Other_Sales`, and `Global_Sales`. The goal is to clean the data by addressing missing values, duplicates, and data types, producing `vgsales_cleaned.csv` for downstream analysis or visualization (e.g., in Tableau).\n",
+        "\n",
+        "This process showcases data cleaning skills essential for data analytics, including handling missing data, transforming variables, and ensuring data quality, aligned with industry-standard practices."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Load Required Libraries\n",
+        "\n",
+        "Load R packages for data manipulation, summary statistics, and exploratory data analysis (EDA). Install if not already available."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Install packages if not present\n",
+        "if (!require(tidyverse)) install.packages(\"tidyverse\", repos = \"http://cran.us.r-project.org\")\n",
+        "if (!require(skimr)) install.packages(\"skimr\", repos = \"http://cran.us.r-project.org\")\n",
+        "if (!require(DataExplorer)) install.packages(\"DataExplorer\", repos = \"http://cran.us.r-project.org\")\n",
+        "\n",
+        "library(tidyverse)     # For data manipulation and visualization\n",
+        "library(skimr)         # For summary statistics\n",
+        "library(DataExplorer)  # For automated EDA"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Read the Dataset\n",
+        "\n",
+        "Load the dataset, treating \"N/A\" and empty strings as missing values."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "df <- read.csv(\"/kaggle/input/video-game-sales/vgsales.csv\", na.strings = c(\"N/A\", \"\"))"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Initial Data Inspection\n",
+        "\n",
+        "Inspect the dataset to identify structure, dimensions, and issues like missing values or incorrect data types."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Check Dimensions\n",
+        "\n",
+        "Verify the number of rows and columns."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "dim(df)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Inspect Structure\n",
+        "\n",
+        "Examine data types and sample values."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "str(df)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### View First Few Rows\n",
+        "\n",
+        "Preview the data to confirm content."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "head(df)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Summary Statistics\n",
+        "\n",
+        "Summarize missing values and distributions using `skimr`."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "skim(df)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Automated EDA\n",
+        "\n",
+        "Visualize missing values and distributions with `DataExplorer`."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "plot_missing(df)   # Missing data visualization\n",
+        "plot_histogram(df) # Histograms for numeric columns"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Data Cleaning Steps\n",
+        "\n",
+        "Based on inspection, address:\n",
+        "\n",
+        "- Missing `Year` values: Impute with median.\n",
+        "- Unknown publishers: Replace with `NA`, impute with mode.\n",
+        "- Duplicates: Remove exact duplicates.\n",
+        "- Skewed sales: Add `Global_Sales_log` for visualizations.\n",
+        "- Categorical variables: Convert `Platform`, `Genre`, `Publisher` to factors.\n",
+        "- Missing sales: Impute with 0."
+      ]
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Step 1: Handle Missing Year Values\n",
+        "\n",
+        "Impute missing `Year` values with the median to support time-based analysis."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Check missing Year values\n",
+        "sum(is.na(df$Year))\n",
+        "\n",
+        "# Convert Year to numeric\n",
+        "df$Year <- as.numeric(df$Year)\n",
+        "\n",
+        "# Impute with median\n",
+        "df$Year[is.na(df$Year)] <- median(df$Year, na.rm = TRUE)\n",
+        "\n",
+        "# Verify\n",
+        "sum(is.na(df$Year))"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Step 2: Handle Unknown Publishers\n",
+        "\n",
+        "Replace \"Unknown\" in `Publisher` with `NA` and impute with the mode (most frequent publisher)."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Check Unknown publishers\n",
+        "sum(df$Publisher == \"Unknown\", na.rm = TRUE)\n",
+        "\n",
+        "# Replace Unknown with NA\n",
+        "df$Publisher[df$Publisher == \"Unknown\"] <- NA\n",
+        "\n",
+        "# Calculate mode publisher\n",
+        "mode_publisher <- names(sort(table(df$Publisher), decreasing = TRUE))[1]\n",
+        "\n",
+        "# Impute NA with mode\n",
+        "df$Publisher[is.na(df$Publisher)] <- mode_publisher\n",
+        "\n",
+        "# Verify\n",
+        "sum(df$Publisher == \"Unknown\", na.rm = TRUE)\n",
+        "sum(is.na(df$Publisher))"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Step 3: Remove Duplicates\n",
+        "\n",
+        "Remove exact duplicates to avoid overcounting."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Check duplicates\n",
+        "sum(duplicated(df))\n",
+        "\n",
+        "# Remove duplicates\n",
+        "df <- df[!duplicated(df), ]\n",
+        "\n",
+        "# Verify\n",
+        "sum(duplicated(df))\n",
+        "dim(df)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Step 4: Add Log-Transformed Global Sales\n",
+        "\n",
+        "Add `Global_Sales_log` using `log1p` to handle skewness for visualizations."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Add log-transformed Global_Sales\n",
+        "df$Global_Sales_log <- log1p(df$Global_Sales)\n",
+        "\n",
+        "# Preview\n",
+        "summary(df$Global_Sales_log)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Step 5: Convert Categorical Columns to Factors\n",
+        "\n",
+        "Convert `Platform`, `Genre`, and `Publisher` to factors for grouping in analysis."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Convert to factors\n",
+        "df$Platform <- as.factor(df$Platform)\n",
+        "df$Genre <- as.factor(df$Genre)\n",
+        "df$Publisher <- as.factor(df$Publisher)\n",
+        "\n",
+        "# Verify\n",
+        "str(df)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Step 6: Handle Missing Sales Values\n",
+        "\n",
+        "Impute missing sales values with 0, assuming no sales recorded."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Check missing sales\n",
+        "colSums(is.na(df[, c(\"NA_Sales\", \"EU_Sales\", \"JP_Sales\", \"Other_Sales\", \"Global_Sales\")]))\n",
+        "\n",
+        "# Impute with 0\n",
+        "df$NA_Sales[is.na(df$NA_Sales)] <- 0\n",
+        "df$EU_Sales[is.na(df$EU_Sales)] <- 0\n",
+        "df$JP_Sales[is.na(df$JP_Sales)] <- 0\n",
+        "df$Other_Sales[is.na(df$Other_Sales)] <- 0\n",
+        "df$Global_Sales[is.na(df$Global_Sales)] <- 0\n",
+        "\n",
+        "# Verify\n",
+        "colSums(is.na(df[, c(\"NA_Sales\", \"EU_Sales\", \"JP_Sales\", \"Other_Sales\", \"Global_Sales\")]))"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "### Step 7: Save Cleaned Dataset\n",
+        "\n",
+        "Save the cleaned dataset as `vgsales_cleaned.csv`."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Save cleaned dataset\n",
+        "write.csv(df, \"vgsales_cleaned.csv\", row.names = FALSE)\n",
+        "\n",
+        "# Confirm file creation\n",
+        "file.exists(\"vgsales_cleaned.csv\")"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    },
+    {
+      "cell_type": "markdown",
+      "source": [
+        "## Final Data Inspection\n",
+        "\n",
+        "Verify the cleaned dataset’s structure and completeness."
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "# Dimensions\n",
+        "dim(df)\n",
+        "\n",
+        "# Structure\n",
+        "str(df)\n",
+        "\n",
+        "# Missing values\n",
+        "plot_missing(df)"
+      ],
+      "metadata": {
+        "trusted": true
+      },
+      "outputs": [],
+      "execution_count": null
+    }
+  ]
+}
