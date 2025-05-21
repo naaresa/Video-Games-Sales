@@ -1,0 +1,227 @@
+---
+title: "Video Game Sales Data Cleaning in R"
+author: "Theresa Gyamfi Allotey"
+date: "2025-05-10"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+This document outlines the data cleaning process for the `vgsales.csv` dataset, sourced from Kaggle. The dataset contains 16,598 records of video game sales across 11 columns: `Rank`, `Name`, `Platform`, `Year`, `Genre`, `Publisher`, `NA_Sales`, `EU_Sales`, `JP_Sales`, `Other_Sales`, and `Global_Sales`. The goal is to clean the data by addressing missing values, duplicates, and data types, producing `vgsales_cleaned.csv` for downstream analysis or visualization (e.g., in Tableau).
+
+This process showcases data cleaning skills essential for data analytics, including handling missing data, transforming variables, and ensuring data quality, aligned with industry-standard practices.
+
+## Load Required Libraries
+
+Load R packages for data manipulation, summary statistics, and exploratory data analysis (EDA). Install if not already available.
+
+```{r load-libraries, eval=FALSE}
+# Install packages if not present
+install.packages("tidyverse")
+install.packages("DataExplorer")
+```
+
+```{r check-packages}
+if (!requireNamespace("skimr", quietly = TRUE)) {
+  install.packages("skimr")
+}
+library(tidyverse)     # For data manipulation and visualization
+library(skimr)         # For summary statistics
+library(DataExplorer)  # For automated EDA
+```
+
+## Read the Dataset
+
+Load the dataset, treating "N/A" and empty strings as missing values.
+
+```{r read-data}
+df <- read.csv("vgsales.csv", na.strings = c("N/A", ""))
+```
+
+## Initial Data Inspection
+
+Inspect the dataset to identify structure, dimensions, and issues like missing values or incorrect data types.
+
+### Check Dimensions
+
+Verify the number of rows and columns.
+
+```{r dim}
+dim(df)
+```
+
+### Inspect Structure
+
+Examine data types and sample values.
+
+```{r structure}
+str(df)
+```
+
+### View First Few Rows
+
+Preview the data to confirm content.
+
+```{r head}
+head(df)
+```
+
+### Summary Statistics
+
+Summarize missing values and distributions using `skimr`.
+
+```{r skim}
+skim(df)
+```
+
+### Automated EDA
+
+Visualize missing values and distributions with `DataExplorer`.
+
+```{r eda, eval=TRUE}
+plot_missing(df)   # Missing data visualization
+plot_histogram(df) # Histograms for numeric columns
+```
+
+## Data Cleaning Steps
+
+Based on inspection, address:
+
+- Missing `Year` values: Impute with median.
+- Unknown publishers: Replace with `NA`, impute with mode.
+- Duplicates: Remove exact duplicates.
+- Skewed sales: Add `Global_Sales_log` for visualizations.
+- Categorical variables: Convert `Platform`, `Genre`, `Publisher` to factors.
+- Missing sales: Impute with 0.
+
+### Step 1: Handle Missing Year Values
+
+Impute missing `Year` values with the median to support time-based analysis.
+
+```{r clean-year}
+# Check missing Year values
+sum(is.na(df$Year))
+
+# Convert Year to numeric
+df$Year <- as.numeric(df$Year)
+
+# Impute with median
+df$Year[is.na(df$Year)] <- median(df$Year, na.rm = TRUE)
+
+# Verify
+sum(is.na(df$Year))
+```
+
+### Step 2: Handle Unknown Publishers
+
+Replace "Unknown" in `Publisher` with `NA` and impute with the mode (most frequent publisher).
+
+```{r clean-publisher}
+# Check Unknown publishers
+sum(df$Publisher == "Unknown", na.rm = TRUE)
+
+# Replace Unknown with NA
+df$Publisher[df$Publisher == "Unknown"] <- NA
+
+# Calculate mode publisher
+mode_publisher <- names(sort(table(df$Publisher), decreasing = TRUE))[1]
+
+# Impute NA with mode
+df$Publisher[is.na(df$Publisher)] <- mode_publisher
+
+# Verify
+sum(df$Publisher == "Unknown", na.rm = TRUE)
+sum(is.na(df$Publisher))
+```
+
+### Step 3: Remove Duplicates
+
+Remove exact duplicates to avoid overcounting.
+
+```{r clean-duplicates}
+# Check duplicates
+sum(duplicated(df))
+
+# Remove duplicates
+df <- df[!duplicated(df), ]
+
+# Verify
+sum(duplicated(df))
+dim(df)
+```
+
+### Step 4: Add Log-Transformed Global Sales
+
+Add `Global_Sales_log` using `log1p` to handle skewness for visualizations.
+
+```{r add-log-sales}
+# Add log-transformed Global_Sales
+df$Global_Sales_log <- log1p(df$Global_Sales)
+
+# Preview
+summary(df$Global_Sales_log)
+```
+
+### Step 5: Convert Categorical Columns to Factors
+
+Convert `Platform`, `Genre`, and `Publisher` to factors for grouping in analysis.
+
+```{r convert-factors}
+# Convert to factors
+df$Platform <- as.factor(df$Platform)
+df$Genre <- as.factor(df$Genre)
+df$Publisher <- as.factor(df$Publisher)
+
+# Verify
+str(df)
+```
+
+### Step 6: Handle Missing Sales Values
+
+Impute missing sales values with 0, assuming no sales recorded.
+
+```{r clean-sales}
+# Check missing sales
+colSums(is.na(df[, c("NA_Sales", "EU_Sales", "JP_Sales", "Other_Sales", "Global_Sales")]))
+
+# Impute with 0
+df$NA_Sales[is.na(df$NA_Sales)] <- 0
+df$EU_Sales[is.na(df$EU_Sales)] <- 0
+df$JP_Sales[is.na(df$JP_Sales)] <- 0
+df$Other_Sales[is.na(df$Other_Sales)] <- 0
+df$Global_Sales[is.na(df$Global_Sales)] <- 0
+
+# Verify
+colSums(is.na(df[, c("NA_Sales", "EU_Sales", "JP_Sales", "Other_Sales", "Global_Sales")]))
+```
+
+### Step 7: Save Cleaned Dataset
+
+Save the cleaned dataset as `vgsales_cleaned.csv`.
+
+```{r save-data}
+# Save cleaned dataset
+write.csv(df, "vgsales_cleaned.csv", row.names = FALSE)
+
+# Confirm file creation
+file.exists("vgsales_cleaned.csv")
+```
+
+## Final Data Inspection
+
+Verify the cleaned dataset’s structure and completeness.
+
+```{r final-inspection}
+# Dimensions
+dim(df)
+
+# Structure
+str(df)
+
+# Missing values
+plot_missing(df)
+```
